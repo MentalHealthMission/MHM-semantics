@@ -332,6 +332,7 @@ def build_derived_spec_from_root(
 
 __all__ = [
     "load_registry",
+    "load_decorator_metadata",
     "build_derived_spec_from_registry",
     "scan_derived_feature_scripts",
     "build_derived_spec_from_data_book",
