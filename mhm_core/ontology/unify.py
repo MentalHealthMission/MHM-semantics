@@ -7,9 +7,9 @@ from typing import Dict, Iterable, List, Mapping, Optional
 
 import pandas as pd
 
-from connect_summary.derived_features import screen_features
-from connect_summary.derived_features.utils import parse_timestamp, select_first_column, to_date, merge_daily_frames
-from connect_summary.reduce_rapids_features import DEFAULT_TIME_COLS, _resolve_feature_column
+from mhm_core.derived_features import screen_features
+from mhm_core.derived_features.utils import merge_daily_frames, parse_timestamp, select_first_column, to_date
+from mhm_core.reduce_rapids_features import DEFAULT_TIME_COLS, _resolve_feature_column
 
 from .config import UnificationFeature
 from .io import read_metric_file, resolve_metric_path
