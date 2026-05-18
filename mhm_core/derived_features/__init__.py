@@ -9,7 +9,6 @@ from .registry import (
     load_decorator_metadata,
     scan_derived_feature_scripts,
 )
-from .runner import run_derived_features_for_participant
 
 __all__ = [
     "build_catalog",
@@ -25,3 +24,10 @@ __all__ = [
     "scan_derived_feature_scripts",
 ]
 
+
+def __getattr__(name: str):
+    if name == "run_derived_features_for_participant":
+        from .runner import run_derived_features_for_participant
+
+        return run_derived_features_for_participant
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

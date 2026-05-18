@@ -77,7 +77,7 @@ def load_metric_catalog(paths: Iterable[Path]) -> Dict[str, Dict[str, object]]:
                 elif tag == f"{{{ODIM_NS}}}hasCategory":
                     cat = child.attrib.get(f"{{{RDF_NS}}}resource")
                     if cat and cat.startswith(ODIM_NS):
-                        categories.append(f"connect:{cat.split('#', 1)[1]}")
+                        categories.append(f"odim:{cat.split('#', 1)[1]}")
                 elif tag == f"{{{ODIM_NS}}}platform":
                     platform = child.attrib.get(f"{{{RDF_NS}}}resource") or (child.text or "").strip()
                     if platform and platform.startswith(ODIM_NS):
@@ -211,7 +211,7 @@ def load_unification_catalog(paths: Iterable[Path]) -> List[UnificationOntologyE
                 elif tag == f"{{{ODIM_NS}}}hasCategory":
                     cat = child.attrib.get(f"{{{RDF_NS}}}resource")
                     if cat and cat.startswith(ODIM_NS):
-                        categories.append(f"connect:{cat.split('#', 1)[1]}")
+                        categories.append(f"odim:{cat.split('#', 1)[1]}")
                 elif tag == f"{{{ODIM_NS}}}usesMetric":
                     metric = (child.text or "").strip()
                     if metric:

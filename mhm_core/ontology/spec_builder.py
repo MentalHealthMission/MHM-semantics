@@ -1,4 +1,4 @@
-"""Build CONNECT run specs from ontology targets."""
+"""Build pipeline run specs from semantic targets."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -160,6 +160,37 @@ def _load_disruptive_classes(path: Path) -> List[str]:
     return entries
 
 
+def _semantic_aliases(value: str) -> Set[str]:
+    """Return neutral semantic ids plus legacy CONNECT category aliases."""
+
+    text = str(value).strip()
+    aliases = {text} if text else set()
+    if text.startswith("connect:Category_"):
+        aliases.add(f"odim:{text.split(':', 1)[1]}")
+    elif text.startswith("odim:Category_"):
+        aliases.add(f"connect:{text.split(':', 1)[1]}")
+    elif text.startswith("Category_"):
+        aliases.add(f"odim:{text}")
+        aliases.add(f"connect:{text}")
+    return aliases
+
+
+def _index_category(mapping: Dict[str, Set[str]], category: str, value: str) -> None:
+    for alias in _semantic_aliases(category):
+        mapping.setdefault(alias, set()).add(value)
+
+
+def _index_unification_category(
+    mapping: Dict[str, List[UnificationEntry]],
+    category: str,
+    entry: UnificationEntry,
+) -> None:
+    for alias in _semantic_aliases(category):
+        bucket = mapping.setdefault(alias, [])
+        if entry not in bucket:
+            bucket.append(entry)
+
+
 def build_plan(
     *,
     targets: List[str],
@@ -238,7 +269,7 @@ def build_plan(
             )
             odim_unification_from_ontology.setdefault(odim_feature, []).append(uni_entry)
             for cat in entry.categories:
-                category_to_unification.setdefault(cat, []).append(uni_entry)
+                _index_unification_category(category_to_unification, cat, uni_entry)
 
     if metric_catalog_path and metric_catalog_path.exists():
         metric_catalog = _load_metric_catalog(metric_catalog_path)
@@ -246,7 +277,7 @@ def build_plan(
     for metric_id, meta in metric_catalog.items():
         cats = meta.get("categories") or []
         for cat in cats:
-            category_to_metrics.setdefault(cat, set()).add(metric_id)
+            _index_category(category_to_metrics, str(cat), metric_id)
 
     derived_catalog = _load_derived_catalog(derived_catalog_path)
     derived_specs = _load_derived_specs(derived_spec_paths)
@@ -348,12 +379,20 @@ def apply_targets(
         if target in metric_catalog:
             plan.metrics.add(target)
             return
-        if target in category_to_metrics or target in category_to_unification:
-            if target in category_to_metrics:
-                plan.metrics.update(category_to_metrics[target])
-            if target in category_to_unification:
+        target_aliases = _semantic_aliases(target)
+        metric_matches = set()
+        unification_matches: List[UnificationEntry] = []
+        for alias in target_aliases:
+            metric_matches.update(category_to_metrics.get(alias, set()))
+            for entry in category_to_unification.get(alias, []):
+                if entry not in unification_matches:
+                    unification_matches.append(entry)
+        if metric_matches or unification_matches:
+            if metric_matches:
+                plan.metrics.update(metric_matches)
+            if unification_matches:
                 plan.needs_unify = True
-                for entry in category_to_unification[target]:
+                for entry in unification_matches:
                     resolve_unification_entry(entry)
             return
         if target in id_to_unification:
@@ -502,8 +541,12 @@ def build_run_spec(
     source_bucket: str,
     source_prefix: str,
     discover_all: bool,
-    participants: List[str],
-    sites: List[str],
+    entities: Optional[List[str]] = None,
+    groups: Optional[List[str]] = None,
+    entity_group_map: Optional[Mapping[str, str]] = None,
+    participants: Optional[List[str]] = None,
+    sites: Optional[List[str]] = None,
+    site_map: Optional[Mapping[str, str]] = None,
     workspace_root: str,
     run_subdir: str,
     outputs: Mapping[str, str],
@@ -594,17 +637,27 @@ def build_run_spec(
             reason_step["rules_dir"] = rules_dir
         steps.append(reason_step)
 
+    source: Dict[str, object] = {
+        "bucket": source_bucket,
+        "prefix": source_prefix,
+        "discover_all": discover_all,
+    }
+    if entities is not None or groups is not None or entity_group_map is not None:
+        source["entities"] = list(entities or [])
+        source["groups"] = list(groups or [])
+        if entity_group_map:
+            source["entity_group_map"] = dict(entity_group_map)
+    else:
+        source["participants"] = list(participants or [])
+        source["sites"] = list(sites or [])
+        if site_map:
+            source["site_map"] = dict(site_map)
+
     return {
         "run_id": run_id,
         "created_by": created_by,
         "created_at": created_at,
-        "source": {
-            "bucket": source_bucket,
-            "prefix": source_prefix,
-            "participants": participants,
-            "discover_all": discover_all,
-            "sites": sites,
-        },
+        "source": source,
         "filters": {"include_metrics": sorted(plan.metrics)},
         "workspace": {"root": workspace_root, "run_subdir": run_subdir},
         "outputs": dict(outputs),

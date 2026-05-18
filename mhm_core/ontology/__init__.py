@@ -20,5 +20,5 @@ try:  # Avoid hard dependency when only config utilities are needed.
         "apply_rules",
         "inferred_phenotypes",
     ]
-except Exception:
+except ModuleNotFoundError:
     pass
