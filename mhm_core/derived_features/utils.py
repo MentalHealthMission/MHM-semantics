@@ -86,8 +86,8 @@ def safe_json_load(value: object) -> Optional[dict]:
     return None
 
 
-def ensure_output_dir(base: Path, participant_id: str) -> Path:
-    target = base / participant_id
+def ensure_output_dir(base: Path, entity_id: str) -> Path:
+    target = base / entity_id
     target.mkdir(parents=True, exist_ok=True)
     return target
 
