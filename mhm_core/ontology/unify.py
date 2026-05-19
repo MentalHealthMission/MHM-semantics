@@ -7,9 +7,7 @@ from typing import Dict, Iterable, List, Mapping, Optional
 
 import pandas as pd
 
-from mhm_core.derived_features import screen_features
 from mhm_core.derived_features.utils import merge_daily_frames, parse_timestamp, select_first_column, to_date
-from mhm_core.reduce_rapids_features import DEFAULT_TIME_COLS, _resolve_feature_column
 
 from .config import UnificationFeature
 from .io import read_metric_file, resolve_metric_path
@@ -116,6 +114,8 @@ def unify_screen_usage(
     site: str,
     participant_id: str,
 ) -> pd.DataFrame:
+    from mhm_core.derived_features import screen_features
+
     if not isinstance(feature.inputs, Mapping):
         raise ValueError(f"screen_usage inputs for {feature.feature_id} must be a mapping")
     inputs_spec = feature.inputs
@@ -290,6 +290,8 @@ def _read_rapids_feature_frame(rapids_dir: Path, participant_id: str, sensor: st
 
 
 def unify_rapids_reduce(*, feature: UnificationFeature, participant_id: str) -> pd.DataFrame:
+    from mhm_core.rapids.reduction import DEFAULT_TIME_COLS, _resolve_feature_column
+
     inputs = feature.inputs or []
     if not isinstance(inputs, list):
         raise ValueError(f"rapids_reduce inputs for {feature.feature_id} must be a list")

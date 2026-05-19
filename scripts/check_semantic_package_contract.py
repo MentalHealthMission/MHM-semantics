@@ -41,6 +41,12 @@ def main() -> int:
                     violations.append(
                         f"{path}:{line_no}: implicit CONNECT asset path for mhm-semantics: {forbidden}"
                     )
+        if path == REPO_ROOT / "mhm_core" / "derived_features" / "__init__.py":
+            exported = _exported_symbols(tree)
+            if "run_derived_features_for_participant" in exported:
+                violations.append(
+                    f"{path}: advertised pipeline-bound runner in mhm-semantics public exports"
+                )
 
     payload = {
         "contract": "mhm-semantics:kernel",
@@ -79,6 +85,20 @@ def _string_literals(tree: ast.AST) -> list[tuple[str, int]]:
 
 def _matches_prefix(module_name: str, prefixes: tuple[str, ...]) -> bool:
     return any(module_name == prefix or module_name.startswith(prefix + ".") for prefix in prefixes)
+
+
+def _exported_symbols(tree: ast.AST) -> set[str]:
+    exported: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets):
+            continue
+        if isinstance(node.value, (ast.List, ast.Tuple)):
+            for item in node.value.elts:
+                if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                    exported.add(item.value)
+    return exported
 
 
 if __name__ == "__main__":  # pragma: no cover

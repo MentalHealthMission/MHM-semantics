@@ -190,6 +190,56 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertEqual(catalog["sensor_mood_score"]["categories"], ["odim:Category_MOOD"])
         self.assertEqual(plan.metrics, {"sensor_mood_score"})
 
+    def test_odim_namespace_is_configurable_with_legacy_alias_compatibility(self) -> None:
+        from mhm_core.ontology.namespaces import LEGACY_CONNECT_ODIM_NAMESPACE, normalize_namespace
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            owl_path = root / "semantic-map.owl"
+            legacy_path = root / "legacy-map.owl"
+            custom_ns = "https://example.org/odim#"
+            owl_path.write_text(
+                textwrap.dedent(
+                    f"""\
+                    <rdf:RDF
+                      xmlns:owl="http://www.w3.org/2002/07/owl#"
+                      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                      xmlns:odim="{custom_ns}">
+                      <owl:NamedIndividual rdf:about="{custom_ns}Metric_sensor_mood_score">
+                        <rdf:type rdf:resource="{custom_ns}MetricDefinition" />
+                        <odim:metricId>sensor_mood_score</odim:metricId>
+                        <odim:observedProperty rdf:resource="{custom_ns}MoodState" />
+                      </owl:NamedIndividual>
+                    </rdf:RDF>
+                    """
+                ),
+                encoding="utf-8",
+            )
+            legacy_path.write_text(
+                textwrap.dedent(
+                    f"""\
+                    <rdf:RDF
+                      xmlns:owl="http://www.w3.org/2002/07/owl#"
+                      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+                      xmlns:odim="{LEGACY_CONNECT_ODIM_NAMESPACE}">
+                      <owl:NamedIndividual rdf:about="{LEGACY_CONNECT_ODIM_NAMESPACE}Metric_legacy_mood_score">
+                        <rdf:type rdf:resource="{LEGACY_CONNECT_ODIM_NAMESPACE}MetricDefinition" />
+                        <odim:metricId>legacy_mood_score</odim:metricId>
+                        <odim:observedProperty rdf:resource="{LEGACY_CONNECT_ODIM_NAMESPACE}MoodState" />
+                      </owl:NamedIndividual>
+                    </rdf:RDF>
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            custom_catalog = load_metric_catalog([owl_path], odim_namespace=custom_ns)
+            legacy_catalog = load_metric_catalog([legacy_path], odim_namespace=custom_ns)
+
+        self.assertEqual(normalize_namespace("https://example.org/odim"), custom_ns)
+        self.assertEqual(custom_catalog["sensor_mood_score"]["observed_property"], "odim:MoodState")
+        self.assertEqual(legacy_catalog["legacy_mood_score"]["observed_property"], "odim:MoodState")
+
     def test_reasoning_graph_runs_on_minimal_non_connect_fixture(self) -> None:
         try:
             import pandas as pd

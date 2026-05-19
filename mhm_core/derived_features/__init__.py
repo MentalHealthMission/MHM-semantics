@@ -20,14 +20,5 @@ __all__ = [
     "odim_computation",
     "odim_defaults",
     "odim_outputs",
-    "run_derived_features_for_participant",
     "scan_derived_feature_scripts",
 ]
-
-
-def __getattr__(name: str):
-    if name == "run_derived_features_for_participant":
-        from .runner import run_derived_features_for_participant
-
-        return run_derived_features_for_participant
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

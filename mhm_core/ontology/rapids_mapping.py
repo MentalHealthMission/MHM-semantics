@@ -15,8 +15,9 @@ except ModuleNotFoundError:  # pragma: no cover - optional unless RAPIDS mapping
 
 import xml.etree.ElementTree as ET
 
+from .namespaces import default_odim_namespace, normalize_namespace
 
-ODIM_NS = "http://connectdigitalstudy.com/ontology#"
+ODIM_NS = default_odim_namespace()
 
 
 def _as_text(value: object) -> str:
@@ -60,6 +61,8 @@ def _load_xml_mappings(paths: Iterable[Path]) -> Tuple[Dict[str, Dict[str, str]]
 
 def load_rapids_input_mappings(
     paths: Iterable[Path],
+    *,
+    odim_namespace: str | None = None,
 ) -> Tuple[Dict[str, Dict[str, str]], Dict[str, str]]:
     """Return (inputs_map, fitbit_inputs) from ontology files."""
     if Graph is None or Namespace is None:
@@ -70,7 +73,7 @@ def load_rapids_input_mappings(
         if path and path.exists():
             graph.parse(path)
 
-    odim = Namespace(ODIM_NS)
+    odim = Namespace(normalize_namespace(odim_namespace or default_odim_namespace()))
     sensor_prop = odim.rapidsSensor
     platform_prop = odim.rapidsPlatform
     metric_prop = odim.rapidsMetric

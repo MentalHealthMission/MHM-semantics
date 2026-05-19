@@ -36,12 +36,12 @@ def load_metric_mapping(path: Path) -> dict:
     return _load_yaml(path)
 
 
-def load_unification_spec(path: Path) -> UnificationSpec:
+def load_unification_spec(path: Path, *, odim_namespace: str | None = None) -> UnificationSpec:
     if path.suffix.lower() == ".owl":
         from .catalog import load_unification_catalog
 
         raw_features = []
-        for entry in load_unification_catalog([path]):
+        for entry in load_unification_catalog([path], odim_namespace=odim_namespace):
             inputs = []
             for spec in entry.inputs:
                 input_spec: Dict[str, object] = {}
