@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 from mhm_core.ontology.catalog import load_metric_catalog
-from mhm_core.ontology.spec_builder import build_plan, build_run_spec
+from mhm_core.ontology.spec_builder import build_plan, build_run_spec, build_semantic_pipeline_steps
 
 
 class SemanticLayerBoundaryTests(unittest.TestCase):
@@ -125,9 +125,26 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
                 ontology_files=[],
                 include_ontology_steps=True,
             )
+            semantic_steps = build_semantic_pipeline_steps(
+                plan=plan,
+                workspace_root="/tmp/mhm-semantic-demo",
+                run_subdir="runs/{run_id}",
+                derived_spec_path=None,
+                rapids_template_path=None,
+                unification_paths=[unification_spec],
+                ontology_mapping_path=root / "semantic-map.owl",
+                ontology_files=[],
+                include_ontology_steps=True,
+            )
 
         self.assertEqual(plan.metrics, {"sensor_mood_score"})
         self.assertTrue(plan.needs_unify)
+        self.assertEqual([step["type"] for step in semantic_steps], ["ontology_select", "ontology_unify"])
+        self.assertNotIn("download", [step["type"] for step in semantic_steps])
+        self.assertEqual(
+            [step["type"] for step in spec["processing"]["steps"][:3]],
+            ["download", "merge", "redact"],
+        )
         self.assertEqual(
             spec["source"],
             {

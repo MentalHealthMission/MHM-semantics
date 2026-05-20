@@ -532,25 +532,11 @@ def build_derived_spec(
     return output_path
 
 
-def build_run_spec(
+def build_semantic_pipeline_steps(
     *,
     plan: SpecPlan,
-    run_id: str,
-    created_by: str,
-    created_at: str,
-    source_bucket: str,
-    source_prefix: str,
-    discover_all: bool,
-    entities: Optional[List[str]] = None,
-    groups: Optional[List[str]] = None,
-    entity_group_map: Optional[Mapping[str, str]] = None,
-    participants: Optional[List[str]] = None,
-    sites: Optional[List[str]] = None,
-    site_map: Optional[Mapping[str, str]] = None,
     workspace_root: str,
     run_subdir: str,
-    outputs: Mapping[str, str],
-    redact_rules: List[Mapping[str, object]],
     derived_spec_path: Optional[Path],
     rapids_template_path: Optional[Path],
     rapids_inputs: Optional[Dict[str, Dict[str, str]]] = None,
@@ -561,12 +547,10 @@ def build_run_spec(
     rules_dir: Optional[str] = None,
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
-) -> dict:
-    steps: List[Dict[str, object]] = [
-        {"type": "download", "update": True},
-        {"type": "merge", "output_format": "csv", "update": True},
-        {"type": "redact", "rules": redact_rules},
-    ]
+) -> List[Dict[str, object]]:
+    """Render semantic/feature-processing steps without CONNECT source plumbing."""
+
+    steps: List[Dict[str, object]] = []
 
     if rapids_template_path or rapids_inputs or rapids_fitbit_inputs:
         rapids_step = build_rapids_step(
@@ -636,6 +620,68 @@ def build_run_spec(
         if rules_dir:
             reason_step["rules_dir"] = rules_dir
         steps.append(reason_step)
+
+    return steps
+
+
+def build_connect_foundation_steps(*, redact_rules: List[Mapping[str, object]]) -> List[Dict[str, object]]:
+    """Render the current CONNECT passive-data foundation steps."""
+
+    return [
+        {"type": "download", "update": True},
+        {"type": "merge", "output_format": "csv", "update": True},
+        {"type": "redact", "rules": redact_rules},
+    ]
+
+
+def build_run_spec(
+    *,
+    plan: SpecPlan,
+    run_id: str,
+    created_by: str,
+    created_at: str,
+    source_bucket: str,
+    source_prefix: str,
+    discover_all: bool,
+    entities: Optional[List[str]] = None,
+    groups: Optional[List[str]] = None,
+    entity_group_map: Optional[Mapping[str, str]] = None,
+    participants: Optional[List[str]] = None,
+    sites: Optional[List[str]] = None,
+    site_map: Optional[Mapping[str, str]] = None,
+    workspace_root: str,
+    run_subdir: str,
+    outputs: Mapping[str, str],
+    redact_rules: List[Mapping[str, object]],
+    derived_spec_path: Optional[Path],
+    rapids_template_path: Optional[Path],
+    rapids_inputs: Optional[Dict[str, Dict[str, str]]] = None,
+    rapids_fitbit_inputs: Optional[Dict[str, str]] = None,
+    unification_paths: List[Path],
+    ontology_mapping_path: Path,
+    ontology_files: List[str],
+    rules_dir: Optional[str] = None,
+    include_ontology_steps: bool = True,
+    source_preference: Optional[List[str]] = None,
+) -> dict:
+    steps = build_connect_foundation_steps(redact_rules=redact_rules)
+    steps.extend(
+        build_semantic_pipeline_steps(
+            plan=plan,
+            workspace_root=workspace_root,
+            run_subdir=run_subdir,
+            derived_spec_path=derived_spec_path,
+            rapids_template_path=rapids_template_path,
+            rapids_inputs=rapids_inputs,
+            rapids_fitbit_inputs=rapids_fitbit_inputs,
+            unification_paths=unification_paths,
+            ontology_mapping_path=ontology_mapping_path,
+            ontology_files=ontology_files,
+            rules_dir=rules_dir,
+            include_ontology_steps=include_ontology_steps,
+            source_preference=source_preference,
+        )
+    )
 
     source: Dict[str, object] = {
         "bucket": source_bucket,
