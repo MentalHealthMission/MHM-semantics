@@ -14,9 +14,9 @@ class OntologyPipelineProfile(PipelineProfilePlugin):
     profile_id = "ontology"
 
     def register_steps(self, registry: Dict[str, Type["PipelineStep"]]) -> None:
-        from mhm_core.pipeline.steps.ontology_reason import OntologyReasonStep
-        from mhm_core.pipeline.steps.ontology_select import OntologySelectStep
-        from mhm_core.pipeline.steps.ontology_unify import OntologyUnifyStep
+        from mhm_core.pipeline.integrations.ontology_reason import OntologyReasonStep
+        from mhm_core.pipeline.integrations.ontology_select import OntologySelectStep
+        from mhm_core.pipeline.integrations.ontology_unify import OntologyUnifyStep
 
         steps: Dict[str, Type["PipelineStep"]] = {
             "ontology_select": OntologySelectStep,
