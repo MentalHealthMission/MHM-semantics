@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import ast
 import fnmatch
+import importlib.util
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 
 import yaml
 
@@ -41,8 +42,19 @@ def _load_source_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def load_decorator_metadata(script_path: Path) -> Dict[str, Any]:
-    tree = ast.parse(_load_source_text(script_path), filename=str(script_path))
+def load_decorator_metadata(script_path: Path, *, _visited: Optional[Set[Path]] = None) -> Dict[str, Any]:
+    resolved_path = script_path.resolve()
+    visited = set(_visited or set())
+    if resolved_path in visited:
+        return {
+            "outputs": [],
+            "computation": {},
+            "defaults": {},
+            "feature_id": None,
+        }
+    visited.add(resolved_path)
+    source_text = _load_source_text(script_path)
+    tree = ast.parse(source_text, filename=str(script_path))
     outputs: List[Dict[str, Any]] = []
     computation: Dict[str, Any] = {}
     defaults: Dict[str, Any] = {}
@@ -102,12 +114,54 @@ def load_decorator_metadata(script_path: Path) -> Dict[str, Any]:
                             defaults[kw.arg] = ast.literal_eval(kw.value)
                         except Exception:
                             continue
-    return {
+    metadata = {
         "outputs": outputs,
         "computation": computation,
         "defaults": defaults,
         "feature_id": script_feature_id,
     }
+    if _metadata_is_empty(metadata):
+        wrapper_target = _star_import_wrapper_target(tree)
+        if wrapper_target is not None:
+            return load_decorator_metadata(wrapper_target, _visited=visited)
+    return metadata
+
+
+def _metadata_is_empty(metadata: Mapping[str, Any]) -> bool:
+    return not (
+        metadata.get("outputs")
+        or metadata.get("computation")
+        or metadata.get("defaults")
+        or metadata.get("feature_id")
+    )
+
+
+def _star_import_wrapper_target(tree: ast.Module) -> Optional[Path]:
+    imports: list[ast.ImportFrom] = []
+    for node in tree.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            continue
+        if isinstance(node, ast.ImportFrom):
+            if node.module == "__future__":
+                continue
+            imports.append(node)
+            continue
+        if isinstance(node, ast.Import) and all(alias.name == "__future__" for alias in node.names):
+            continue
+        return None
+    if len(imports) != 1:
+        return None
+    import_node = imports[0]
+    if import_node.level != 0 or not import_node.module:
+        return None
+    if not any(alias.name == "*" for alias in import_node.names):
+        return None
+    spec = importlib.util.find_spec(import_node.module)
+    origin = getattr(spec, "origin", None) if spec is not None else None
+    if not origin or origin in {"built-in", "frozen"}:
+        return None
+    target = Path(origin)
+    return target if target.suffix == ".py" and target.exists() else None
 
 
 def _merge_dict(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
