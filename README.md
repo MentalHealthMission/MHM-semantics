@@ -1,20 +1,21 @@
 # MHM Semantics
 
-Python semantic runtime for ODIM-MH/MHM pipeline use.
+Python tools for working with ODIM-MH/MHM semantic assets.
 
-This repository contains ontology loading, namespace configuration, feature
-selection, unification, reasoning, semantic planning, and derived-feature
-metadata helpers. The base ontology assets remain in
-`MentalHealthMission/MHM-ontology`.
+Use this package to load ontology assets, configure namespaces, select
+features, resolve semantic mappings, run lightweight reasoning helpers, and
+generate derived-feature metadata.
 
-## What This Package Owns
+The base ontology assets are maintained in `MentalHealthMission/MHM-ontology`.
 
-- ontology loading and cache helpers
-- configurable namespace handling
-- feature and rule catalogues
-- semantic unification and reasoning helpers
-- derived-feature metadata generation
-- semantic run-spec planning primitives
+## What You Can Do
+
+- load and cache ontology files
+- configure namespace aliases
+- inspect feature and rule catalogues
+- unify semantic feature definitions
+- generate derived-feature metadata
+- build semantic run specifications
 
 ## Install
 
