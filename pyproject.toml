@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mhm-semantics"
+version = "0.1.0"
+description = "Semantic runtime and derived-feature metadata helpers for MHM pipelines"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML==6.0.2",
+  "pandas==2.3.3",
+  "rdflib==7.0.0",
+  "mhm-pipelines @ git+https://github.com/MentalHealthMission/MHM-data-pipelines.git@refactor/bootstrap-2026-05-22",
+]
+
+[tool.setuptools.packages.find]
+include = [
+  "mhm_core.ontology*",
+  "mhm_core.derived_features*",
+  "mhm_core.profiles.ontology*",
+]
+namespaces = true
