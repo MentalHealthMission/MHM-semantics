@@ -624,16 +624,6 @@ def build_semantic_pipeline_steps(
     return steps
 
 
-def build_connect_foundation_steps(*, redact_rules: List[Mapping[str, object]]) -> List[Dict[str, object]]:
-    """Render the current CONNECT passive-data foundation steps."""
-
-    return [
-        {"type": "download", "update": True},
-        {"type": "merge", "output_format": "csv", "update": True},
-        {"type": "redact", "rules": redact_rules},
-    ]
-
-
 def build_run_spec(
     *,
     plan: SpecPlan,
@@ -652,7 +642,7 @@ def build_run_spec(
     workspace_root: str,
     run_subdir: str,
     outputs: Mapping[str, str],
-    redact_rules: List[Mapping[str, object]],
+    redact_rules: Optional[List[Mapping[str, object]]] = None,
     derived_spec_path: Optional[Path],
     rapids_template_path: Optional[Path],
     rapids_inputs: Optional[Dict[str, Dict[str, str]]] = None,
@@ -664,23 +654,27 @@ def build_run_spec(
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
 ) -> dict:
-    steps = build_connect_foundation_steps(redact_rules=redact_rules)
-    steps.extend(
-        build_semantic_pipeline_steps(
-            plan=plan,
-            workspace_root=workspace_root,
-            run_subdir=run_subdir,
-            derived_spec_path=derived_spec_path,
-            rapids_template_path=rapids_template_path,
-            rapids_inputs=rapids_inputs,
-            rapids_fitbit_inputs=rapids_fitbit_inputs,
-            unification_paths=unification_paths,
-            ontology_mapping_path=ontology_mapping_path,
-            ontology_files=ontology_files,
-            rules_dir=rules_dir,
-            include_ontology_steps=include_ontology_steps,
-            source_preference=source_preference,
-        )
+    """Render a generic semantic run spec without CONNECT source plumbing.
+
+    ``redact_rules`` is accepted for backwards compatibility with older callers
+    that used this generic builder as a CONNECT renderer. CONNECT passive-data
+    foundation steps now live in ``connect_summary.ontology.spec_builder``.
+    """
+
+    steps = build_semantic_pipeline_steps(
+        plan=plan,
+        workspace_root=workspace_root,
+        run_subdir=run_subdir,
+        derived_spec_path=derived_spec_path,
+        rapids_template_path=rapids_template_path,
+        rapids_inputs=rapids_inputs,
+        rapids_fitbit_inputs=rapids_fitbit_inputs,
+        unification_paths=unification_paths,
+        ontology_mapping_path=ontology_mapping_path,
+        ontology_files=ontology_files,
+        rules_dir=rules_dir,
+        include_ontology_steps=include_ontology_steps,
+        source_preference=source_preference,
     )
 
     source: Dict[str, object] = {

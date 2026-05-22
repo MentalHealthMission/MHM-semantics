@@ -142,8 +142,8 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertEqual([step["type"] for step in semantic_steps], ["ontology_select", "ontology_unify"])
         self.assertNotIn("download", [step["type"] for step in semantic_steps])
         self.assertEqual(
-            [step["type"] for step in spec["processing"]["steps"][:3]],
-            ["download", "merge", "redact"],
+            [step["type"] for step in spec["processing"]["steps"]],
+            ["ontology_select", "ontology_unify"],
         )
         self.assertEqual(
             spec["source"],
@@ -162,6 +162,72 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         rendered = json.dumps(spec, sort_keys=True)
         self.assertNotIn("ontology/connect", rendered)
         self.assertNotIn("connect-ontology", rendered)
+
+    def test_connect_semantic_adapter_adds_passive_data_foundation_steps(self) -> None:
+        from connect_summary.ontology.spec_builder import build_run_spec as build_connect_run_spec
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            derived_catalog = root / "derived-catalog.yaml"
+            phenotype_catalog = root / "phenotype-catalog.yaml"
+            unification_spec = root / "unification.yaml"
+            derived_catalog.write_text("derived_features: []\n", encoding="utf-8")
+            phenotype_catalog.write_text("phenotypes: {}\n", encoding="utf-8")
+            unification_spec.write_text(
+                textwrap.dedent(
+                    """
+                    features:
+                      - id: daily_mood_score
+                        odim_feature: odim:DailyMoodScore
+                        category: odim:Wellbeing
+                        method: daily_sum
+                        output_column: daily_mood_score
+                        inputs:
+                          - metric: sensor_mood_score
+                            time_column: observed_at
+                            value_column: score
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            plan = build_plan(
+                targets=["odim:DailyMoodScore"],
+                metrics=[],
+                prefer=["metric"],
+                derived_catalog_path=derived_catalog,
+                derived_spec_paths=[],
+                unification_paths=[unification_spec],
+                phenotype_catalog_path=phenotype_catalog,
+            )
+            spec = build_connect_run_spec(
+                plan=plan,
+                run_id="connect-semantic-demo",
+                created_by="test",
+                created_at="2026-05-22T00:00:00Z",
+                source_bucket="connect-uom",
+                source_prefix="output",
+                discover_all=False,
+                participants=["participant-alpha"],
+                sites=["test"],
+                workspace_root="/tmp/connect-semantic-demo",
+                run_subdir="runs/{run_id}",
+                outputs={"manifest_key": "/tmp/manifest.json"},
+                redact_rules=[{"metric": "example", "column": "value.secret"}],
+                derived_spec_path=None,
+                rapids_template_path=None,
+                unification_paths=[unification_spec],
+                ontology_mapping_path=root / "semantic-map.owl",
+                ontology_files=[],
+            )
+
+        self.assertEqual(
+            [step["type"] for step in spec["processing"]["steps"][:3]],
+            ["download", "merge", "redact"],
+        )
+        self.assertEqual(spec["processing"]["steps"][3]["type"], "ontology_select")
+        self.assertIn("participants", spec["source"])
+        self.assertIn("sites", spec["source"])
 
     def test_ontology_catalog_uses_neutral_category_curie_with_connect_alias_compatibility(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -313,7 +379,6 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
                 "rapids_mapping",
                 "reason",
                 "rules_catalog",
-                "spec_builder",
                 "unify",
             )
         ]
@@ -336,6 +401,13 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
                     )
                 ]
                 self.assertEqual(logic_nodes, [])
+
+    def test_connect_spec_builder_is_classified_application_adapter(self) -> None:
+        source = Path("connect_summary/ontology/spec_builder.py").read_text(encoding="utf-8")
+
+        self.assertIn("build_connect_foundation_steps", source)
+        self.assertIn("from mhm_core.ontology.spec_builder import", source)
+        self.assertNotIn("ontology/connect", source)
 
 
 if __name__ == "__main__":
