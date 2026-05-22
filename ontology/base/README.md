@@ -1,4 +1,8 @@
 # Base ontology
 
-The MHM base ontology lives in `external/mhm-ontology/mhm_ontology.owl`.
-This directory exists to keep the base/extension separation explicit in the repo.
+The MHM base ontology is maintained in the
+`MentalHealthMission/MHM-ontology` repository.
+
+This directory is reserved for runtime-facing base ontology integration notes.
+It should not be used for project-specific ontology extensions or generated
+pipeline assets.
