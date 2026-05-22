@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import json
 import subprocess
 import sys
@@ -163,73 +162,7 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertNotIn("ontology/connect", rendered)
         self.assertNotIn("connect-ontology", rendered)
 
-    def test_connect_semantic_adapter_adds_passive_data_foundation_steps(self) -> None:
-        from connect_summary.ontology.spec_builder import build_run_spec as build_connect_run_spec
-
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            derived_catalog = root / "derived-catalog.yaml"
-            phenotype_catalog = root / "phenotype-catalog.yaml"
-            unification_spec = root / "unification.yaml"
-            derived_catalog.write_text("derived_features: []\n", encoding="utf-8")
-            phenotype_catalog.write_text("phenotypes: {}\n", encoding="utf-8")
-            unification_spec.write_text(
-                textwrap.dedent(
-                    """
-                    features:
-                      - id: daily_mood_score
-                        odim_feature: odim:DailyMoodScore
-                        category: odim:Wellbeing
-                        method: daily_sum
-                        output_column: daily_mood_score
-                        inputs:
-                          - metric: sensor_mood_score
-                            time_column: observed_at
-                            value_column: score
-                    """
-                ),
-                encoding="utf-8",
-            )
-
-            plan = build_plan(
-                targets=["odim:DailyMoodScore"],
-                metrics=[],
-                prefer=["metric"],
-                derived_catalog_path=derived_catalog,
-                derived_spec_paths=[],
-                unification_paths=[unification_spec],
-                phenotype_catalog_path=phenotype_catalog,
-            )
-            spec = build_connect_run_spec(
-                plan=plan,
-                run_id="connect-semantic-demo",
-                created_by="test",
-                created_at="2026-05-22T00:00:00Z",
-                source_bucket="connect-uom",
-                source_prefix="output",
-                discover_all=False,
-                participants=["participant-alpha"],
-                sites=["test"],
-                workspace_root="/tmp/connect-semantic-demo",
-                run_subdir="runs/{run_id}",
-                outputs={"manifest_key": "/tmp/manifest.json"},
-                redact_rules=[{"metric": "example", "column": "value.secret"}],
-                derived_spec_path=None,
-                rapids_template_path=None,
-                unification_paths=[unification_spec],
-                ontology_mapping_path=root / "semantic-map.owl",
-                ontology_files=[],
-            )
-
-        self.assertEqual(
-            [step["type"] for step in spec["processing"]["steps"][:3]],
-            ["download", "merge", "redact"],
-        )
-        self.assertEqual(spec["processing"]["steps"][3]["type"], "ontology_select")
-        self.assertIn("participants", spec["source"])
-        self.assertIn("sites", spec["source"])
-
-    def test_ontology_catalog_uses_neutral_category_curie_with_connect_alias_compatibility(self) -> None:
+    def test_ontology_catalog_uses_neutral_category_curie_with_historical_alias_compatibility(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             owl_path = root / "semantic-map.owl"
@@ -250,7 +183,7 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
                         <odim:metricId>sensor_mood_score</odim:metricId>
                         <odim:observedProperty rdf:resource="http://connectdigitalstudy.com/ontology#MoodState" />
                         <odim:hasCategory rdf:resource="http://connectdigitalstudy.com/ontology#Category_MOOD" />
-                        <rdfs:comment>Example non-CONNECT semantic fixture metric.</rdfs:comment>
+                        <rdfs:comment>Example semantic fixture metric.</rdfs:comment>
                       </owl:NamedIndividual>
                     </rdf:RDF>
                     """
@@ -274,7 +207,7 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertEqual(plan.metrics, {"sensor_mood_score"})
 
     def test_odim_namespace_is_configurable_with_legacy_alias_compatibility(self) -> None:
-        from mhm_core.ontology.namespaces import LEGACY_CONNECT_ODIM_NAMESPACE, normalize_namespace
+        from mhm_core.ontology.namespaces import HISTORICAL_ODIM_NAMESPACE, normalize_namespace
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -304,11 +237,11 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
                     <rdf:RDF
                       xmlns:owl="http://www.w3.org/2002/07/owl#"
                       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-                      xmlns:odim="{LEGACY_CONNECT_ODIM_NAMESPACE}">
-                      <owl:NamedIndividual rdf:about="{LEGACY_CONNECT_ODIM_NAMESPACE}Metric_legacy_mood_score">
-                        <rdf:type rdf:resource="{LEGACY_CONNECT_ODIM_NAMESPACE}MetricDefinition" />
+                      xmlns:odim="{HISTORICAL_ODIM_NAMESPACE}">
+                      <owl:NamedIndividual rdf:about="{HISTORICAL_ODIM_NAMESPACE}Metric_legacy_mood_score">
+                        <rdf:type rdf:resource="{HISTORICAL_ODIM_NAMESPACE}MetricDefinition" />
                         <odim:metricId>legacy_mood_score</odim:metricId>
-                        <odim:observedProperty rdf:resource="{LEGACY_CONNECT_ODIM_NAMESPACE}MoodState" />
+                        <odim:observedProperty rdf:resource="{HISTORICAL_ODIM_NAMESPACE}MoodState" />
                       </owl:NamedIndividual>
                     </rdf:RDF>
                     """
@@ -323,7 +256,7 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertEqual(custom_catalog["sensor_mood_score"]["observed_property"], "odim:MoodState")
         self.assertEqual(legacy_catalog["legacy_mood_score"]["observed_property"], "odim:MoodState")
 
-    def test_reasoning_graph_runs_on_minimal_non_connect_fixture(self) -> None:
+    def test_reasoning_graph_runs_on_minimal_fixture(self) -> None:
         try:
             import pandas as pd
             from mhm_core.ontology.reason import FeaturePlanEntry, build_graph
@@ -356,58 +289,6 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertGreater(len(graph), 0)
         self.assertIn("DailyMoodScore", graph.serialize(format="turtle"))
         self.assertIn("entity-alpha", graph.serialize(format="turtle"))
-
-    def test_connect_summary_ontology_paths_are_thin_compatibility_wrappers(self) -> None:
-        from connect_summary.ontology.catalog import load_metric_catalog as compat_catalog
-        from connect_summary.ontology.spec_builder import build_plan as compat_build_plan
-        from mhm_core.ontology.catalog import load_metric_catalog as core_catalog
-        from mhm_core.ontology.spec_builder import build_plan as core_build_plan
-
-        self.assertIs(compat_catalog, core_catalog)
-        self.assertIs(compat_build_plan, core_build_plan)
-
-    def test_moved_connect_summary_ontology_paths_do_not_define_business_logic(self) -> None:
-        wrapper_paths = [
-            Path("connect_summary/ontology") / f"{module_name}.py"
-            for module_name in (
-                "__init__",
-                "cache",
-                "catalog",
-                "config",
-                "io",
-                "preference",
-                "rapids_mapping",
-                "reason",
-                "rules_catalog",
-                "unify",
-            )
-        ]
-        for path in wrapper_paths:
-            with self.subTest(path=str(path)):
-                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-                logic_nodes = [
-                    node
-                    for node in ast.walk(tree)
-                    if isinstance(
-                        node,
-                        (
-                            ast.FunctionDef,
-                            ast.AsyncFunctionDef,
-                            ast.ClassDef,
-                            ast.Assign,
-                            ast.AnnAssign,
-                            ast.AugAssign,
-                        ),
-                    )
-                ]
-                self.assertEqual(logic_nodes, [])
-
-    def test_connect_spec_builder_is_classified_application_adapter(self) -> None:
-        source = Path("connect_summary/ontology/spec_builder.py").read_text(encoding="utf-8")
-
-        self.assertIn("build_connect_foundation_steps", source)
-        self.assertIn("from mhm_core.ontology.spec_builder import", source)
-        self.assertNotIn("ontology/connect", source)
 
 
 if __name__ == "__main__":

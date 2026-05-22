@@ -161,7 +161,7 @@ def _load_disruptive_classes(path: Path) -> List[str]:
 
 
 def _semantic_aliases(value: str) -> Set[str]:
-    """Return neutral semantic ids plus legacy CONNECT category aliases."""
+    """Return neutral semantic ids plus historical category aliases."""
 
     text = str(value).strip()
     aliases = {text} if text else set()
@@ -548,7 +548,7 @@ def build_semantic_pipeline_steps(
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
 ) -> List[Dict[str, object]]:
-    """Render semantic/feature-processing steps without CONNECT source plumbing."""
+    """Render semantic and feature-processing steps without source plumbing."""
 
     steps: List[Dict[str, object]] = []
 
@@ -654,11 +654,12 @@ def build_run_spec(
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
 ) -> dict:
-    """Render a generic semantic run spec without CONNECT source plumbing.
+    """Render a generic semantic run spec without project source plumbing.
 
-    ``redact_rules`` is accepted for backwards compatibility with older callers
-    that used this generic builder as a CONNECT renderer. CONNECT passive-data
-    foundation steps now live in ``connect_summary.ontology.spec_builder``.
+    ``redact_rules`` is accepted for backwards compatibility with older
+    application adapters that used this generic builder as a project renderer.
+    Project-specific passive-data foundation steps should live in adapter
+    packages.
     """
 
     steps = build_semantic_pipeline_steps(

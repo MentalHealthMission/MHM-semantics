@@ -1,7 +1,7 @@
 """Ontology namespace bindings.
 
-The current ODIM assets still use the historical CONNECT URL. Treat that URI as
-a compatibility namespace, not a hard-coded semantic-kernel assumption.
+Some ODIM assets use a historical namespace URL. Treat that URI as a
+compatibility namespace, not a hard-coded semantic-kernel assumption.
 """
 
 from __future__ import annotations
@@ -10,19 +10,19 @@ import os
 from typing import Iterable
 
 
-LEGACY_CONNECT_ODIM_NAMESPACE = "http://connectdigitalstudy.com/ontology#"
+HISTORICAL_ODIM_NAMESPACE = "http://connectdigitalstudy.com/ontology#"
 ODIM_NAMESPACE_ENV = "MHM_ODIM_NAMESPACE"
 
 
 def normalize_namespace(namespace: str) -> str:
-    value = str(namespace or "").strip() or LEGACY_CONNECT_ODIM_NAMESPACE
+    value = str(namespace or "").strip() or HISTORICAL_ODIM_NAMESPACE
     if value.endswith(("#", "/")):
         return value
     return value + "#"
 
 
 def default_odim_namespace() -> str:
-    return normalize_namespace(os.getenv(ODIM_NAMESPACE_ENV, LEGACY_CONNECT_ODIM_NAMESPACE))
+    return normalize_namespace(os.getenv(ODIM_NAMESPACE_ENV, HISTORICAL_ODIM_NAMESPACE))
 
 
 def odim_namespaces(
@@ -31,7 +31,7 @@ def odim_namespaces(
     aliases: Iterable[str] = (),
 ) -> tuple[str, ...]:
     ordered: list[str] = []
-    for candidate in [namespace or default_odim_namespace(), LEGACY_CONNECT_ODIM_NAMESPACE, *aliases]:
+    for candidate in [namespace or default_odim_namespace(), HISTORICAL_ODIM_NAMESPACE, *aliases]:
         normalized = normalize_namespace(candidate)
         if normalized not in ordered:
             ordered.append(normalized)
@@ -54,7 +54,7 @@ def odim_uri(local: str, *, namespace: str | None = None) -> str:
 
 
 __all__ = [
-    "LEGACY_CONNECT_ODIM_NAMESPACE",
+    "HISTORICAL_ODIM_NAMESPACE",
     "ODIM_NAMESPACE_ENV",
     "default_odim_namespace",
     "normalize_namespace",

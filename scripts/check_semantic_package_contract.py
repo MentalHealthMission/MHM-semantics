@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the rehearsed MHM semantic package boundary."""
+"""Check the MHM semantic package boundary."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def main() -> int:
             for forbidden in FORBIDDEN_ASSET_STRINGS:
                 if forbidden in value:
                     violations.append(
-                        f"{path}:{line_no}: implicit CONNECT asset path for mhm-semantics: {forbidden}"
+                        f"{path}:{line_no}: implicit project-specific asset path for mhm-semantics: {forbidden}"
                     )
         if path == REPO_ROOT / "mhm_core" / "derived_features" / "__init__.py":
             exported = _exported_symbols(tree)
