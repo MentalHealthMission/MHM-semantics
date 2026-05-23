@@ -11,7 +11,7 @@ dependencies = [
   "PyYAML==6.0.2",
   "pandas==2.3.3",
   "rdflib==7.0.0",
-  "mhm-pipelines @ git+https://github.com/MentalHealthMission/MHM-data-pipelines.git@386100a1077b748dcff4db42676e27cbc68328e9",
+  "mhm-pipelines @ git+https://github.com/MentalHealthMission/MHM-data-pipelines.git@a1b3283838cc2847341f8a9d1c38f9694c0335cb",
 ]
 
 [tool.setuptools.packages.find]
