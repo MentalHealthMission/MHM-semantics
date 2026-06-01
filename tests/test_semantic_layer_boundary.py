@@ -207,7 +207,15 @@ class SemanticLayerBoundaryTests(unittest.TestCase):
         self.assertEqual(plan.metrics, {"sensor_mood_score"})
 
     def test_odim_namespace_is_configurable_with_legacy_alias_compatibility(self) -> None:
-        from mhm_core.ontology.namespaces import HISTORICAL_ODIM_NAMESPACE, normalize_namespace
+        from mhm_core.ontology.namespaces import (
+            DEFAULT_ODIM_NAMESPACE,
+            HISTORICAL_ODIM_NAMESPACE,
+            default_odim_namespace,
+            normalize_namespace,
+        )
+
+        self.assertEqual(default_odim_namespace(), normalize_namespace(DEFAULT_ODIM_NAMESPACE))
+        self.assertNotEqual(default_odim_namespace(), normalize_namespace(HISTORICAL_ODIM_NAMESPACE))
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

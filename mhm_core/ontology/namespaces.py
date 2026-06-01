@@ -1,8 +1,4 @@
-"""Ontology namespace bindings.
-
-Some ODIM assets use a historical namespace URL. Treat that URI as a
-compatibility namespace, not a hard-coded semantic-kernel assumption.
-"""
+"""Ontology namespace bindings."""
 
 from __future__ import annotations
 
@@ -10,19 +6,20 @@ import os
 from typing import Iterable
 
 
+DEFAULT_ODIM_NAMESPACE = "https://w3id.org/mhm/odim#"
 HISTORICAL_ODIM_NAMESPACE = "http://connectdigitalstudy.com/ontology#"
 ODIM_NAMESPACE_ENV = "MHM_ODIM_NAMESPACE"
 
 
 def normalize_namespace(namespace: str) -> str:
-    value = str(namespace or "").strip() or HISTORICAL_ODIM_NAMESPACE
+    value = str(namespace or "").strip() or DEFAULT_ODIM_NAMESPACE
     if value.endswith(("#", "/")):
         return value
     return value + "#"
 
 
 def default_odim_namespace() -> str:
-    return normalize_namespace(os.getenv(ODIM_NAMESPACE_ENV, HISTORICAL_ODIM_NAMESPACE))
+    return normalize_namespace(os.getenv(ODIM_NAMESPACE_ENV, DEFAULT_ODIM_NAMESPACE))
 
 
 def odim_namespaces(
@@ -55,6 +52,7 @@ def odim_uri(local: str, *, namespace: str | None = None) -> str:
 
 __all__ = [
     "HISTORICAL_ODIM_NAMESPACE",
+    "DEFAULT_ODIM_NAMESPACE",
     "ODIM_NAMESPACE_ENV",
     "default_odim_namespace",
     "normalize_namespace",
