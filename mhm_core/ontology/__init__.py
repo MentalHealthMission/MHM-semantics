@@ -1,16 +1,20 @@
 """Ontology integration utilities."""
 
 from .config import load_metric_mapping, load_unification_spec, select_features, write_feature_plan
+from .execution_profile import load_execution_profile, parse_execution_profile, validate_profile_rules
 from .namespaces import DEFAULT_ODIM_NAMESPACE, default_odim_namespace, odim_namespaces, normalize_namespace
 
 __all__ = [
     "default_odim_namespace",
     "DEFAULT_ODIM_NAMESPACE",
     "load_metric_mapping",
+    "load_execution_profile",
     "load_unification_spec",
     "normalize_namespace",
     "odim_namespaces",
     "select_features",
+    "parse_execution_profile",
+    "validate_profile_rules",
     "write_feature_plan",
 ]
 

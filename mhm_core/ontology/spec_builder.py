@@ -9,6 +9,11 @@ import re
 import yaml
 
 from .catalog import load_metric_catalog as load_metric_catalog_owl, load_unification_catalog
+from .execution_profile import (
+    RequirementExpression,
+    SemanticOperation,
+    load_execution_profile,
+)
 from .preference import normalize_source_preference, source_type_from_method
 
 @dataclass
@@ -39,8 +44,26 @@ class SpecPlan:
     unification_feature_ids: Set[str] = field(default_factory=set)
     unification_specs: Set[str] = field(default_factory=set)
     phenotype_rules: Set[str] = field(default_factory=set)
+    semantic_operation_ids: Set[str] = field(default_factory=set)
+    rule_tokens: Dict[str, Dict[str, object]] = field(default_factory=dict)
     needs_unify: bool = False
     needs_reason: bool = False
+
+
+@dataclass(frozen=True)
+class SpecPlanningCatalog:
+    """Preloaded semantic inputs used to resolve one or more target plans."""
+
+    metric_catalog: Mapping[str, Mapping[str, object]]
+    category_to_metrics: Mapping[str, Set[str]]
+    category_to_unification: Mapping[str, List[UnificationEntry]]
+    odim_to_unification: Mapping[str, List[UnificationEntry]]
+    id_to_unification: Mapping[str, UnificationEntry]
+    odim_to_derived: Mapping[str, Set[str]]
+    derived_specs: Mapping[str, Mapping[str, object]]
+    phenotypes: Mapping[str, Mapping[str, object]]
+    semantic_operations: Mapping[str, SemanticOperation]
+    disruptive_classes: List[str]
 
 
 def _load_yaml(path: Path) -> dict:
@@ -161,7 +184,7 @@ def _load_disruptive_classes(path: Path) -> List[str]:
 
 
 def _semantic_aliases(value: str) -> Set[str]:
-    """Return neutral semantic ids plus historical category aliases."""
+    """Return neutral semantic ids plus legacy CONNECT category aliases."""
 
     text = str(value).strip()
     aliases = {text} if text else set()
@@ -191,11 +214,8 @@ def _index_unification_category(
             bucket.append(entry)
 
 
-def build_plan(
+def load_spec_planning_catalog(
     *,
-    targets: List[str],
-    metrics: List[str],
-    prefer: List[str],
     derived_catalog_path: Path,
     derived_spec_paths: List[Path],
     unification_paths: List[Path],
@@ -203,8 +223,8 @@ def build_plan(
     metric_catalog_path: Optional[Path] = None,
     ontology_paths: Optional[List[Path]] = None,
     disruptive_ontology_path: Optional[Path] = None,
-) -> SpecPlan:
-    plan = SpecPlan()
+    execution_profile_path: Optional[Path] = None,
+) -> SpecPlanningCatalog:
     metric_catalog: Dict[str, Dict[str, object]] = {}
     category_to_metrics: Dict[str, Set[str]] = {}
     odim_unification_from_ontology: Dict[str, List[UnificationEntry]] = {}
@@ -282,6 +302,10 @@ def build_plan(
     derived_catalog = _load_derived_catalog(derived_catalog_path)
     derived_specs = _load_derived_specs(derived_spec_paths)
     phenotypes = _load_phenotype_catalog(phenotype_catalog_path)
+    semantic_operations: Dict[str, SemanticOperation] = {}
+    if execution_profile_path:
+        profile = load_execution_profile(execution_profile_path)
+        semantic_operations = dict(profile.operation_by_output)
     unification_entries = _parse_unification_specs(unification_paths)
 
     odim_to_unification: Dict[str, List[UnificationEntry]] = {}
@@ -307,11 +331,7 @@ def build_plan(
     if disruptive_ontology_path:
         disruptive_classes = _load_disruptive_classes(disruptive_ontology_path)
 
-    return apply_targets(
-        plan,
-        targets=targets,
-        metrics=metrics,
-        prefer=prefer,
+    return SpecPlanningCatalog(
         metric_catalog=metric_catalog,
         category_to_metrics=category_to_metrics,
         category_to_unification=category_to_unification,
@@ -320,8 +340,69 @@ def build_plan(
         odim_to_derived=odim_to_derived,
         derived_specs=derived_specs,
         phenotypes=phenotypes,
+        semantic_operations=semantic_operations,
         disruptive_classes=disruptive_classes,
     )
+
+
+def build_plan_from_catalog(
+    catalog: SpecPlanningCatalog,
+    *,
+    targets: List[str],
+    metrics: List[str],
+    prefer: List[str],
+) -> SpecPlan:
+    """Resolve a target plan without reparsing its semantic source files."""
+
+    return apply_targets(
+        SpecPlan(),
+        targets=targets,
+        metrics=metrics,
+        prefer=prefer,
+        metric_catalog=dict(catalog.metric_catalog),
+        category_to_metrics=dict(catalog.category_to_metrics),
+        category_to_unification=dict(catalog.category_to_unification),
+        odim_to_unification=dict(catalog.odim_to_unification),
+        id_to_unification=dict(catalog.id_to_unification),
+        odim_to_derived=dict(catalog.odim_to_derived),
+        derived_specs=dict(catalog.derived_specs),
+        phenotypes=dict(catalog.phenotypes),
+        semantic_operations=dict(catalog.semantic_operations),
+        disruptive_classes=list(catalog.disruptive_classes),
+    )
+
+
+def build_plan(
+    *,
+    targets: List[str],
+    metrics: List[str],
+    prefer: List[str],
+    derived_catalog_path: Path,
+    derived_spec_paths: List[Path],
+    unification_paths: List[Path],
+    phenotype_catalog_path: Path,
+    metric_catalog_path: Optional[Path] = None,
+    ontology_paths: Optional[List[Path]] = None,
+    disruptive_ontology_path: Optional[Path] = None,
+    execution_profile_path: Optional[Path] = None,
+) -> SpecPlan:
+    catalog = load_spec_planning_catalog(
+        derived_catalog_path=derived_catalog_path,
+        derived_spec_paths=derived_spec_paths,
+        unification_paths=unification_paths,
+        phenotype_catalog_path=phenotype_catalog_path,
+        metric_catalog_path=metric_catalog_path,
+        ontology_paths=ontology_paths,
+        disruptive_ontology_path=disruptive_ontology_path,
+        execution_profile_path=execution_profile_path,
+    )
+    return build_plan_from_catalog(
+        catalog,
+        targets=targets,
+        metrics=metrics,
+        prefer=prefer,
+    )
+
 
 def apply_targets(
     plan: SpecPlan,
@@ -337,9 +418,11 @@ def apply_targets(
     odim_to_derived: Dict[str, Set[str]],
     derived_specs: Dict[str, Dict[str, object]],
     phenotypes: Dict[str, Dict[str, object]],
+    semantic_operations: Dict[str, SemanticOperation],
     disruptive_classes: List[str],
 ) -> SpecPlan:
     source_preference = normalize_source_preference(prefer)
+    acquire_all_routes_depth = 0
 
     def resolve_unification_entry(entry: UnificationEntry) -> None:
         plan.unification_feature_ids.add(entry.feature_id)
@@ -364,6 +447,10 @@ def apply_targets(
                 resolved_candidates.append(id_to_unification[cand.feature_id])
             else:
                 resolved_candidates.append(cand)
+        if acquire_all_routes_depth:
+            for entry in resolved_candidates:
+                resolve_unification_entry(entry)
+            return
         for pref in source_preference:
             chosen = [
                 cand
@@ -374,6 +461,41 @@ def apply_targets(
                 for entry in chosen:
                     resolve_unification_entry(entry)
                 break
+
+    resolving_operations: Set[str] = set()
+
+    def resolve_requirement(requirement: RequirementExpression) -> None:
+        if requirement.operator == "concept":
+            if requirement.concept in semantic_operations:
+                resolve_target(requirement.concept)
+            else:
+                resolve_odim_feature(requirement.concept)
+            return
+        # Resolve every declared alternative. The reasoner retains the logical
+        # anyOf semantics while acquisition maximises entity coverage.
+        for child in requirement.children:
+            resolve_requirement(child)
+
+    def resolve_semantic_operation(operation: SemanticOperation) -> None:
+        nonlocal acquire_all_routes_depth
+        if operation.operation_id in resolving_operations:
+            raise ValueError(f"Cyclic semantic operation requirements: {operation.operation_id}")
+        if operation.operation_id in plan.semantic_operation_ids:
+            return
+        resolving_operations.add(operation.operation_id)
+        plan.needs_unify = True
+        plan.needs_reason = True
+        plan.semantic_operation_ids.add(operation.operation_id)
+        plan.phenotype_rules.add(operation.rule.path)
+        plan.rule_tokens[operation.rule.path] = operation.bind_parameters()
+        if operation.evidence_policy == "all-feasible-routes":
+            acquire_all_routes_depth += 1
+        try:
+            resolve_requirement(operation.requirements)
+        finally:
+            if operation.evidence_policy == "all-feasible-routes":
+                acquire_all_routes_depth -= 1
+            resolving_operations.remove(operation.operation_id)
 
     def resolve_target(target: str) -> None:
         if target in metric_catalog:
@@ -400,7 +522,9 @@ def apply_targets(
             plan.needs_unify = True
             return
         if target.startswith("odim:"):
-            if target in phenotypes:
+            if target in semantic_operations:
+                resolve_semantic_operation(semantic_operations[target])
+            elif target in phenotypes:
                 plan.needs_unify = True
                 plan.needs_reason = True
                 rule_info = phenotypes[target]
@@ -548,7 +672,7 @@ def build_semantic_pipeline_steps(
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
 ) -> List[Dict[str, object]]:
-    """Render semantic and feature-processing steps without source plumbing."""
+    """Render semantic/feature-processing steps without CONNECT source plumbing."""
 
     steps: List[Dict[str, object]] = []
 
@@ -617,6 +741,10 @@ def build_semantic_pipeline_steps(
             "trace_summary": True,
             "trace_max_paths": 3,
         }
+        if plan.rule_tokens:
+            reason_step["rule_tokens"] = {
+                path: dict(tokens) for path, tokens in sorted(plan.rule_tokens.items())
+            }
         if rules_dir:
             reason_step["rules_dir"] = rules_dir
         steps.append(reason_step)
@@ -654,12 +782,11 @@ def build_run_spec(
     include_ontology_steps: bool = True,
     source_preference: Optional[List[str]] = None,
 ) -> dict:
-    """Render a generic semantic run spec without project source plumbing.
+    """Render a generic semantic run spec without CONNECT source plumbing.
 
-    ``redact_rules`` is accepted for backwards compatibility with older
-    application adapters that used this generic builder as a project renderer.
-    Project-specific passive-data foundation steps should live in adapter
-    packages.
+    ``redact_rules`` is accepted for backwards compatibility with older callers
+    that used this generic builder as a CONNECT renderer. CONNECT passive-data
+    foundation steps now live in ``connect_summary.ontology.spec_builder``.
     """
 
     steps = build_semantic_pipeline_steps(

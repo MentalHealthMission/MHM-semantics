@@ -8,9 +8,10 @@ from typing import Dict, Iterable, Mapping, Optional
 import pandas as pd
 
 import yaml
-from rdflib import Graph, Literal, Namespace, RDF, URIRef
+from rdflib import Graph, Literal, Namespace, RDF, URIRef, Variable
 from rdflib.namespace import RDFS, XSD
 import re
+import shlex
 
 from .namespaces import default_odim_namespace, normalize_namespace
 
@@ -165,46 +166,57 @@ def apply_rules(
 ) -> Graph:
     rule_text = rule_path.read_text(encoding="utf-8")
     tokens = dict(tokens or {})
-    for key, value in tokens.items():
-        rule_text = rule_text.replace(f"{{{key}}}", str(value))
+    values_re = re.compile(r"VALUES\s*\(([^)]*)\)\s*\{([^}]*)\}", re.IGNORECASE | re.DOTALL)
+    tuple_re = re.compile(r"\(([^)]*)\)")
+    bindings: Dict[Variable, Literal] = {}
+    consumed: set[str] = set()
 
-    def _format_token(value: object) -> str:
-        if value is None:
-            return ""
-        return str(value)
+    def bind_values(match: re.Match[str]) -> str:
+        var_names = [item.strip().lstrip("?") for item in match.group(1).split() if item.strip()]
+        tuple_match = tuple_re.search(match.group(2))
+        if not var_names or tuple_match is None:
+            return match.group(0)
+        try:
+            defaults = shlex.split(tuple_match.group(1).strip())
+        except ValueError:
+            defaults = tuple_match.group(1).strip().split()
+        if len(defaults) < len(var_names):
+            return match.group(0)
+        if not set(var_names).intersection(tokens):
+            return match.group(0)
+        for index, name in enumerate(var_names):
+            value = tokens.get(name, _coerce_sparql_default(defaults[index]))
+            bindings[Variable(name)] = Literal(value)
+            consumed.add(name)
+        return ""
 
-    def _apply_values_overrides(text: str) -> str:
-        values_re = re.compile(r"VALUES\\s*\\(([^)]*)\\)\\s*\\{([^}]*)\\}", re.IGNORECASE | re.DOTALL)
-
-        def replace_block(match: re.Match[str]) -> str:
-            vars_raw = match.group(1)
-            body = match.group(2)
-            var_names = [item.strip().lstrip("?") for item in vars_raw.split() if item.strip()]
-            if not var_names:
-                return match.group(0)
-            tuple_re = re.compile(r"\\(([^)]*)\\)")
-
-            def replace_tuple(tmatch: re.Match[str]) -> str:
-                values = tmatch.group(1).strip().split()
-                if not values:
-                    return tmatch.group(0)
-                for idx, var_name in enumerate(var_names):
-                    if var_name in tokens and idx < len(values):
-                        values[idx] = _format_token(tokens[var_name])
-                return "(" + " ".join(values) + ")"
-
-            return f"VALUES ({vars_raw}) {{{tuple_re.sub(replace_tuple, body)}}}"
-
-        return values_re.sub(replace_block, text)
-
-    if tokens:
-        rule_text = _apply_values_overrides(rule_text)
-    result = graph.query(rule_text)
+    rule_text = values_re.sub(bind_values, rule_text)
+    placeholders = set(re.findall(r"\{([A-Za-z_][A-Za-z0-9_]*)\}", rule_text))
+    if placeholders:
+        raise ValueError(
+            f"Rule {rule_path} uses unsupported textual parameters: {', '.join(sorted(placeholders))}"
+        )
+    unknown = sorted(set(tokens).difference(consumed))
+    if unknown:
+        raise ValueError(f"Rule {rule_path} does not declare parameters: {', '.join(unknown)}")
+    result = graph.query(rule_text, initBindings=bindings)
     constructed = getattr(result, "graph", None)
     if constructed is None:
         return graph
     graph += constructed
     return graph
+
+
+def _coerce_sparql_default(value: str) -> object:
+    text = str(value).strip()
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
+    if text.lower() in {"true", "false"}:
+        return text.lower() == "true"
+    try:
+        return float(text) if any(marker in text.lower() for marker in (".", "e")) else int(text)
+    except ValueError:
+        return text
 
 
 def _odim_namespace(odim_namespace: str | None = None) -> Namespace:

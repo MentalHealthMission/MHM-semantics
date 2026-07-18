@@ -24,3 +24,6 @@ include = [
   "mhm_core.profiles.ontology*",
 ]
 namespaces = true
+
+[tool.setuptools.package-data]
+"mhm_core.ontology" = ["schemas/*.json"]

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://w3id.org/mhm/schemas/semantic-execution-profile-v1.schema.json",
+  "title": "MHM semantic execution profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId", "namespaces", "operations"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "profileId": {"type": "string", "minLength": 1},
+    "namespaces": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "operations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/operation"}
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concept"],
+          "properties": {
+            "concept": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*:.+$"},
+            "role": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allOf"],
+          "properties": {
+            "allOf": {"type": "array", "items": {"$ref": "#/$defs/requirement"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["anyOf"],
+          "properties": {
+            "anyOf": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/requirement"}
+            }
+          }
+        }
+      ]
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "type": {"enum": ["integer", "number", "string", "boolean"]},
+        "required": {"type": "boolean"},
+        "default": {},
+        "unit": {"type": "string"},
+        "minimum": {"type": "number"},
+        "maximum": {"type": "number"},
+        "fixed": {"type": "boolean"}
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "output", "rule", "requirements"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "evidencePolicy": {"enum": ["all-feasible-routes", "first-feasible-route"]},
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concept", "kind"],
+          "properties": {
+            "concept": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*:.+$"},
+            "kind": {"type": "string", "minLength": 1},
+            "granularity": {"type": "string", "minLength": 1},
+            "artifacts": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "path"],
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1}
+          }
+        },
+        "requirements": {"$ref": "#/$defs/requirement"},
+        "parameters": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/parameter"}
+        }
+      }
+    }
+  }
+}
